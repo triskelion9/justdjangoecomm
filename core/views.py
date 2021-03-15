@@ -8,17 +8,13 @@ from .models import Item, Order, OrderItem
 
 class Home(ListView):
     model = Item
+    paginate_by = 8
     template_name = 'home-page.html'
 
 
 class Product(DetailView):
     model = Item
     template_name = 'product-page.html'
-
-
-class Catalog(ListView):
-    model = Item
-    template_name = 'catalog.html'
 
 
 def checkout(request):

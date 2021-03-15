@@ -8,14 +8,12 @@ from core.views import (
     add_to_cart,
     remove_from_cart,
     Home,
-    Product,
-    Catalog
+    Product
 )
 
 urlpatterns = [
     path('', Home.as_view(), name="home"),
     path('checkout/', checkout, name="checkout"),
-    path('products/', Catalog.as_view(), name="catalog"),
     path('products/<slug:slug>/', Product.as_view(), name="product"),
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
