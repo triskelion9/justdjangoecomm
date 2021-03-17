@@ -17,6 +17,11 @@ class Product(DetailView):
     template_name = 'product-page.html'
 
 
+class OrderSummaryView(DetailView):
+    model = Order
+    template_name = 'order-summary.html'
+
+
 def checkout(request):
     context = {
     }
