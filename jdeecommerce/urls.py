@@ -7,12 +7,15 @@ from core.views import (
     add_to_cart,
     remove_from_cart,
     remove_single_item_from_cart,
+    create_payment,
     Home,
     Product,
     OrderSummaryView,
     Checkout,
-    PaymentView
+    PaymentView,
 )
+
+app_name = 'core'
 
 urlpatterns = [
     path('', Home.as_view(), name="home"),
@@ -29,10 +32,10 @@ urlpatterns = [
         remove_single_item_from_cart,
         name="remove-single-item-from-cart"
     ),
-
+    path('create-payment-intent/', create_payment, name="create-payment"),
     # shop
     path('order-summary/', OrderSummaryView.as_view(), name="order-summary"),
-    path('payment/<slug:slug>', PaymentView.as_view(), name="payment")
+    path('checkout/payment/<payment_option>/', PaymentView.as_view(), name="payment")
 ]
 
 if settings.DEBUG:

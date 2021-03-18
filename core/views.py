@@ -4,10 +4,16 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+from django.conf import settings
 from django.views.generic import View, ListView, DetailView
-from .models import Item, Order, OrderItem, BillingAddress
+from .models import Item, Order, OrderItem, BillingAddress, Payment
 from .forms import CheckoutForm
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_protect
+import stripe
 # Create your views here.
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 class Home(ListView):
@@ -55,7 +61,6 @@ class Checkout(View):
                 # same_shipping_address_as_billing = form.cleaned_data.get('same_shipping_address_as_billing')
                 # save_info = form.cleaned_data.get('save_info')
                 payment_option = form.cleaned_data.get('payment_option')
-
                 billing_address = BillingAddress(
                     user = self.request.user,
                     street_address = street_address,
@@ -66,9 +71,12 @@ class Checkout(View):
                 billing_address.save()
                 order.billing_address = billing_address
                 order.save()
-                # Add redirect to the selected payment handler view
 
-                return redirect('checkout')
+                # Add redirect to the selected payment handler view
+                if payment_option == 'S':
+                    print(self.request)
+                    return redirect('payment', payment_option='stripe')
+
             messages.warning(self.request, 'Failed checkout.')
             return redirect('checkout')
         except ObjectDoesNotExist:
@@ -78,7 +86,45 @@ class Checkout(View):
 
 class PaymentView(View):
     def get(self, *args, **kwargs):
+        # order
         return render(self.request, "payment.html")
+
+    def post(self, *args, **kwargs):
+        order = Order.objects.get(user=self.user, ordered=False)
+        token = self.request.POST.get('stripeToken')  # None
+        ammount = order.get_total()
+        charge = stripe.Charge.create(
+            amount=int(order.get_total() * 100),
+            currency="usd",
+            source=token,
+        )
+
+        # create payment
+        payment = Payment()
+        payment.stripe_charge_id = charge['id']
+        payment.user = self.request.user
+        payment.ammount = ammount
+        payment.save()
+
+        # assign payment to order
+        order.ordered = True
+        order.payment = payment
+        order.save()
+
+        messages.success(self.request, 'Your order has been placed')
+        return redirect("/")
+
+
+@csrf_protect
+def create_payment(request):
+    intent = stripe.PaymentIntent.create(
+        amount=1400,
+        currency='usd'
+    )
+    return JsonResponse({
+        'clientSecret': intent['client_secret']
+    })
+
 
 # Utils
 
