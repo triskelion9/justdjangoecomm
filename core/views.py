@@ -67,6 +67,7 @@ class Checkout(View):
                 order.billing_address = billing_address
                 order.save()
                 # Add redirect to the selected payment handler view
+
                 return redirect('checkout')
             messages.warning(self.request, 'Failed checkout.')
             return redirect('checkout')
@@ -74,6 +75,10 @@ class Checkout(View):
             messages.error(self.request, 'You do not have an active order')
             return redirect('/')
 
+
+class PaymentView(View):
+    def get(self, *args, **kwargs):
+        return render(self.request, "payment.html")
 
 # Utils
 
