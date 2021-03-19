@@ -28,3 +28,12 @@ class CheckoutForm(forms.Form):
     same_shipping_address_as_billing = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
     save_info = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
     payment_option = forms.ChoiceField(widget=forms.RadioSelect, choices=PAYMENT_CHOICES)
+
+
+class CouponForm(forms.Form):
+    code = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        'class': 'form-control',
+        'placeholder': 'Promo Code',
+        'aria-label': 'Recipient\'s Username',
+        'aria-describedby': 'basic-addon2'
+    }))

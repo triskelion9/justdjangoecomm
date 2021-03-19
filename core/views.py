@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.views.generic import View, ListView, DetailView
 from .models import Item, Order, OrderItem, BillingAddress, Payment
-from .forms import CheckoutForm
+from .forms import CheckoutForm, CouponForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
 import stripe
@@ -44,7 +44,9 @@ class Checkout(View):
     def get(self, *args, **kwargs):
         form = CheckoutForm()
         context = {
-            'form': form
+            'form': form,
+            'couponForm': CouponForm(),
+            'order': Order.objects.get(user=self.request.user, ordered=False)
         }
         return render(self.request, 'checkout-page.html', context)
 
@@ -219,3 +221,34 @@ def remove_single_item_from_cart(request, slug):
         messages.info(request, 'No active order found.')
 
     return redirect('order-summary')
+
+
+def get_coupon(request, code):
+    try:
+        coupon = Coupon.objects.get(code=code)
+    except ObjectDoesNotExist:
+        messages.info(request, "This coupon is not valid.")
+        return redirect('checkout')
+
+    return coupon
+
+
+def add_coupon(request):
+    if request.method == 'POST':
+        form = CouponForm(request.POST or None)
+        if form.is_valid():
+            try:
+                order = Order.objects.get(
+                    user = request.user,
+                    ordered = False
+                )
+
+                code = form.cleaned_data.get('code')
+                order.coupon = get_coupon(request, code)
+                order.save()
+                messages.info(request, 'Successfully added coupon')
+                return redirect('checkout')
+            except ObjectDoesNotExist:
+                messages.info(request, 'Could not use that coupon.')
+                return redirect('checkout')
+    return None
