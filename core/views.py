@@ -6,11 +6,13 @@ from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
 from django.views.generic import View, ListView, DetailView
-from .models import Item, Order, OrderItem, BillingAddress, Payment
-from .forms import CheckoutForm, CouponForm
+from .models import Item, Order, OrderItem, BillingAddress, Payment, Refund
+from .forms import CheckoutForm, CouponForm, RefundForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
 import stripe
+import random
+import string
 # Create your views here.
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -111,10 +113,42 @@ class PaymentView(View):
         # assign payment to order
         order.ordered = True
         order.payment = payment
+        order.ref_code = create_refference_code()
         order.save()
 
         messages.success(self.request, 'Your order has been placed')
         return redirect("/")
+
+
+class RequestRefund(View):
+    def get(self, *args, **kwargs):
+        form = RefundForm()
+        context = {
+            'form': form
+        }
+        return render(self.request, "request-refund.html", context)
+
+    def post(self, *args, **kwargs):
+        form = RefundForm(self.request.POST)
+        if form.is_valid():
+            ref_code = form.cleaned_data.get('ref_code')
+            message = form.cleaned_data.get('message')
+
+            try:
+                order = Order.objects.get(ref_code=ref_code)
+                order.refund_requested = True
+                order.save()
+
+                refund = Refund()
+                refund.order = order
+                refund.reson = message
+                refund.save()
+
+                messages.info(self.request, 'Your request has reached us')
+                return redirect('/')
+            except ObjectDoesNotExist:
+                messages.info(self.request, "This order does not exist.")
+                return redirect('request-refund')
 
 
 @csrf_protect
@@ -252,3 +286,7 @@ def add_coupon(request):
                 messages.info(request, 'Could not use that coupon.')
                 return redirect('checkout')
     return None
+
+
+def create_refference_code():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))

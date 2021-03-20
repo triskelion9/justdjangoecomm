@@ -37,3 +37,11 @@ class CouponForm(forms.Form):
         'aria-label': 'Recipient\'s Username',
         'aria-describedby': 'basic-addon2'
     }))
+
+
+class RefundForm(forms.Form):
+    ref_code = forms.CharField()
+    message = forms.CharField(widget=forms.Textarea(attrs={
+        'rows': 3,
+    }))
+    email = forms.EmailField()

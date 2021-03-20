@@ -13,7 +13,8 @@ from core.views import (
     OrderSummaryView,
     Checkout,
     PaymentView,
-    add_coupon
+    add_coupon,
+    RequestRefund
 )
 
 app_name = 'core'
@@ -37,7 +38,8 @@ urlpatterns = [
     path('create-payment-intent/', create_payment, name="create-payment"),
     # shop
     path('order-summary/', OrderSummaryView.as_view(), name="order-summary"),
-    path('checkout/payment/<payment_option>/', PaymentView.as_view(), name="payment")
+    path('checkout/payment/<payment_option>/', PaymentView.as_view(), name="payment"),
+    path('request-refund/', RequestRefund.as_view(), name="request-refund")
 ]
 
 if settings.DEBUG:
