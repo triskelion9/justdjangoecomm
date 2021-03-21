@@ -10,23 +10,30 @@ PAYMENT_CHOICES = (
 
 
 class CheckoutForm(forms.Form):
-    street_address = forms.CharField(widget=forms.TextInput(attrs={
-        'placeholder': '1234 Main St.',
-        'class': 'w-100 mt-2'
-    }))
-    appartment_address = forms.CharField(required=False, widget=forms.TextInput(attrs={
-        'placeholder': 'Appartment or Suite',
-        'class': 'w-100 mt-2'
-    }))
-    country = CountryField(blank_label="Select Country").formfield(
+    shipping_address = forms.CharField(required=False)
+    shipping_address2 = forms.CharField(required=False)
+    shipping_country = CountryField(blank_label="Select Country").formfield(
+        required=False,
         widget=CountrySelectWidget(attrs={
             'class': 'custom-select d-block w-100'
         }))
-    zip = forms.CharField(widget=forms.TextInput(attrs={
-        'class': 'form-control'
-    }))
-    same_shipping_address_as_billing = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
-    save_info = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+    shipping_zip = forms.CharField(widget=forms.TextInput(), required=False)
+
+    billing_address = forms.CharField(required=False)
+    billing_address2 = forms.CharField(required=False)
+    billing_country = CountryField(blank_label="Select Country").formfield(
+        required=False,
+        widget=CountrySelectWidget(attrs={
+            'class': 'custom-select d-block w-100'
+        }))
+    billing_zip = forms.CharField(widget=forms.TextInput(), required=False)
+
+    same_billing_address = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+    set_default_shipping = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+    use_default_shipping = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+    set_default_billing = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+    use_default_billing = forms.BooleanField(widget=forms.CheckboxInput(), required=False)
+
     payment_option = forms.ChoiceField(widget=forms.RadioSelect, choices=PAYMENT_CHOICES)
 
 

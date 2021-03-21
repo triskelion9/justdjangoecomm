@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Item, OrderItem, Order, Coupon
+from .models import Item, OrderItem, Order, Coupon, Address, Refund
 
 # Register your models here.
 
@@ -34,11 +34,13 @@ class OrderAdmin(admin.ModelAdmin):
         'refund_granted',
         'user',
         'billing_address',
+        'shipping_address',
         'payment',
         'coupon'
     ]
     list_display_links = [
         'user',
+        'shipping_address',
         'billing_address',
         'payment',
         'coupon'
@@ -57,7 +59,37 @@ class OrderAdmin(admin.ModelAdmin):
     ]
 
 
+class AddressAdmin(admin.ModelAdmin):
+    list_display = [
+        'user',
+        'street_address',
+        'appartment_address',
+        'country',
+        'zip',
+        'address_type',
+        'default',
+    ]
+
+    list_filter = [
+        'country',
+        'default',
+        'address_type'
+    ]
+
+    search_fields = [
+        'user',
+        'street_address',
+        'appartment_address',
+        'country',
+        'zip',
+        'address_type',
+        'default',
+    ]
+
+
 admin.site.register(Item)
 admin.site.register(OrderItem)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(Coupon)
+admin.site.register(Refund)
+admin.site.register(Address, AddressAdmin)
