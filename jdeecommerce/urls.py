@@ -7,7 +7,6 @@ from core.views import (
     add_to_cart,
     remove_from_cart,
     remove_single_item_from_cart,
-    create_payment,
     Home,
     Product,
     OrderSummaryView,
@@ -16,7 +15,8 @@ from core.views import (
     add_coupon,
     RequestRefund,
     SuccessView,
-    CanceledView
+    CanceledView,
+    stripe_webhook_view
 )
 
 app_name = 'core'
@@ -43,7 +43,10 @@ urlpatterns = [
     # shop
     path('order-summary/', OrderSummaryView.as_view(), name="order-summary"),
     path('checkout/payment/<payment_option>/', PaymentView.as_view(), name="payment"),
-    path('request-refund/', RequestRefund.as_view(), name="request-refund")
+    path('request-refund/', RequestRefund.as_view(), name="request-refund"),
+
+    # stripe webhooks
+    path('stripe/webhook/', stripe_webhook_view, name="stripe-webhook")
 ]
 
 if settings.DEBUG:

@@ -1,31 +1,24 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.contrib import messages
 from django.conf import settings
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.generic import View, ListView, DetailView
-
-from .models import Item, Order, OrderItem, Address, Payment, Refund
+from .models import Item, Order, OrderItem, Address, Refund, Coupon
 from .forms import CheckoutForm, CouponForm, RefundForm
-
+import json
 import stripe
 import random
 import string
 # Create your views here.
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
-
-
-def is_valid_form(values):
-    valid = True
-    for field in values:
-        if field == '':
-            valid = False
-    return valid
 
 
 class Home(ListView):
@@ -203,9 +196,6 @@ class Checkout(View):
             return redirect('/')
 
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-
 class PaymentView(View):
     def get(self, *args, **kwargs):
         # order
@@ -216,6 +206,7 @@ class PaymentView(View):
         order = Order.objects.get(user=request.user, ordered=False)
         # construct the order items
         line_items = []
+        products = []
         for item in order.items.all():
             line_items.append({
                 'price_data': {
@@ -227,10 +218,16 @@ class PaymentView(View):
                 },
                 'quantity': item.quantity
             })
+
+            products.append(item.item.pk)
         # attach the order items to the order
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=line_items,
+            metadata={
+                'product_ids': json.dumps(products),
+                'user': request.user
+            },
             mode='payment',
             success_url=YOUR_DOMAIN + '/success/',
             cancel_url=YOUR_DOMAIN + '/cancel/',
@@ -282,6 +279,17 @@ class RequestRefund(View):
                 return redirect('request-refund')
 
 
+# Utils
+
+
+def is_valid_form(values):
+    valid = True
+    for field in values:
+        if field == '':
+            valid = False
+    return valid
+
+
 @csrf_protect
 def create_payment(request):
     intent = stripe.PaymentIntent.create(
@@ -291,9 +299,6 @@ def create_payment(request):
     return JsonResponse({
         'clientSecret': intent['client_secret']
     })
-
-
-# Utils
 
 
 @login_required
@@ -421,3 +426,44 @@ def add_coupon(request):
 
 def create_refference_code():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+
+
+@csrf_exempt
+def stripe_webhook_view(request):
+    payload = request.body
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    event = None
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError:
+        # Invalid signature
+        return HttpResponse(status=400)
+
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        print(session)
+
+        customer_email = session['customer_details']['email']
+        products = session['metadata']
+
+        print(products)
+        send_mail(
+            subject="Here is your order infos",
+            message="Thanks for your purchase",
+            recipient_list=[customer_email],
+            from_email="alin@jdecommerce.com"
+        )
+        # Fulfill the purchase...
+        # define a fulfill_order(session)
+        user = User.objects.get(username=session['metadata']['user'])
+        order = Order.objects.get(user=user)
+        order.ordered = True
+        order.save()
+
+    return HttpResponse(status=200)
