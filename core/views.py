@@ -1,15 +1,17 @@
-from django.shortcuts import render, get_object_or_404, redirect
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.utils import timezone
 from django.conf import settings
+from django.utils import timezone
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.csrf import csrf_protect
 from django.views.generic import View, ListView, DetailView
+
 from .models import Item, Order, OrderItem, Address, Payment, Refund
 from .forms import CheckoutForm, CouponForm, RefundForm
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_protect
+
 import stripe
 import random
 import string
@@ -201,36 +203,52 @@ class Checkout(View):
             return redirect('/')
 
 
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+
 class PaymentView(View):
     def get(self, *args, **kwargs):
         # order
         return render(self.request, "payment.html")
 
-    def post(self, *args, **kwargs):
-        order = Order.objects.get(user=self.user, ordered=False)
-        token = self.request.POST.get('stripeToken')  # None
-        ammount = order.get_total()
-        charge = stripe.Charge.create(
-            amount=int(order.get_total() * 100),
-            currency="usd",
-            source=token,
+    def post(self, request, *args, **kwargs):
+        YOUR_DOMAIN = 'http://127.0.0.1:8000'
+        order = Order.objects.get(user=request.user, ordered=False)
+        # construct the order items
+        line_items = []
+        for item in order.items.all():
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    'unit_amount': int(item.item.get_price() * 100),
+                    'product_data': {
+                        'name': item.item.title
+                    },
+                },
+                'quantity': item.quantity
+            })
+        # attach the order items to the order
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
+            mode='payment',
+            success_url=YOUR_DOMAIN + '/success/',
+            cancel_url=YOUR_DOMAIN + '/cancel/',
         )
 
-        # create payment
-        payment = Payment()
-        payment.stripe_charge_id = charge['id']
-        payment.user = self.request.user
-        payment.ammount = ammount
-        payment.save()
+        return JsonResponse({
+            'id': checkout_session.id
+        })
 
-        # assign payment to order
-        order.ordered = True
-        order.payment = payment
-        order.ref_code = create_refference_code()
-        order.save()
 
-        messages.success(self.request, 'Your order has been placed')
-        return redirect("/")
+class SuccessView(View):
+    def get(self, *args, **kwargs):
+        return render(self.request, "payment-success.html")
+
+
+class CanceledView(View):
+    def get(self, *args, **kwargs):
+        return render(self.request, "payment-canceled.html")
 
 
 class RequestRefund(View):

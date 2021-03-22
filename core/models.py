@@ -38,6 +38,11 @@ class Item(models.Model):
     def __str__(self):
         return self.title
 
+    def get_price(self):
+        if self.discount_price:
+            return self.discount_price
+        return self.price
+
     def get_absolute_url(self):
         return reverse('product', kwargs={
             'slug': self.slug

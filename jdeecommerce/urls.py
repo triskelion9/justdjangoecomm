@@ -14,7 +14,9 @@ from core.views import (
     Checkout,
     PaymentView,
     add_coupon,
-    RequestRefund
+    RequestRefund,
+    SuccessView,
+    CanceledView
 )
 
 app_name = 'core'
@@ -35,7 +37,9 @@ urlpatterns = [
         remove_single_item_from_cart,
         name="remove-single-item-from-cart"
     ),
-    path('create-payment-intent/', create_payment, name="create-payment"),
+    path('create-payment-intent/', PaymentView.as_view(), name="create-payment"),
+    path('success/', SuccessView.as_view(), name="success"),
+    path('cancel/', CanceledView.as_view(), name="canceled"),
     # shop
     path('order-summary/', OrderSummaryView.as_view(), name="order-summary"),
     path('checkout/payment/<payment_option>/', PaymentView.as_view(), name="payment"),
