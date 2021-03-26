@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.csrf import csrf_protect, csrf_exempt
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View, ListView, DetailView
 from .models import Item, Order, OrderItem, Address, Refund, Coupon
 from .forms import CheckoutForm, CouponForm, RefundForm
@@ -186,8 +186,9 @@ class Checkout(View):
 
                 # Add redirect to the selected payment handler view
                 if payment_option == 'S':
-                    print(self.request)
                     return redirect('payment', payment_option='stripe')
+                elif payment_option == 'SI':
+                    return redirect('payment-intent/')
 
             messages.warning(self.request, 'Failed checkout.')
             return redirect('checkout')
@@ -279,7 +280,44 @@ class RequestRefund(View):
                 return redirect('request-refund')
 
 
-# Utils
+class StripeIntentView(View):
+    def get(self, *args, **kwargs):
+        # order
+        return render(self.request, "payment-intent.html")
+
+    def post(self, request, *args, **kwargs):
+        order = Order.objects.get(user=request.user, ordered=False)
+        products = []
+        for item in order.items.all():
+            products.append({
+                'name': item.item.title,
+                'quantity': item.quantity
+            })
+        try:
+            request_body = json.loads(request.body)
+            customer = stripe.Customer.create(email=request_body['email'])
+            intent = stripe.PaymentIntent.create(
+                amount=int(order.get_total() * 100),
+                currency='usd',
+                customer = customer['id'],
+                metadata={
+                    'products': json.dumps(products)
+                },
+            )
+
+            # Finish the order
+            order.ordered = True
+            order.save()
+
+            return JsonResponse({
+                'clientSecret': intent['client_secret']
+            })
+        except Exception as e:
+            print(str(e))
+            return JsonResponse({'error': str(e)})
+
+
+# Utility Functions
 
 
 def is_valid_form(values):
@@ -290,15 +328,15 @@ def is_valid_form(values):
     return valid
 
 
-@csrf_protect
-def create_payment(request):
-    intent = stripe.PaymentIntent.create(
-        amount=1400,
-        currency='usd'
-    )
-    return JsonResponse({
-        'clientSecret': intent['client_secret']
-    })
+# @csrf_protect
+# def create_payment(request):
+#     intent = stripe.PaymentIntent.create(
+#         amount=1400,
+#         currency='usd'
+#     )
+#     return JsonResponse({
+#         'clientSecret': intent['client_secret']
+#     })
 
 
 @login_required
@@ -445,25 +483,40 @@ def stripe_webhook_view(request):
         # Invalid signature
         return HttpResponse(status=400)
 
+    # hook for complete purchase session
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        print(session)
 
         customer_email = session['customer_details']['email']
         products = session['metadata']
 
-        print(products)
         send_mail(
             subject="Here is your order infos",
             message="Thanks for your purchase",
             recipient_list=[customer_email],
             from_email="alin@jdecommerce.com"
         )
+
         # Fulfill the purchase...
-        # define a fulfill_order(session)
         user = User.objects.get(username=session['metadata']['user'])
         order = Order.objects.get(user=user)
         order.ordered = True
         order.save()
+
+    elif event['type'] == 'payment_intent.succeeded':
+        session = event['data']['object']
+        print(session)
+        stripe_customer_id = session['customer']
+        stripe_customer = stripe.Customer.retrieve(stripe_customer_id)
+        stripe_customer_email = stripe_customer['email']
+
+        products = session['metadata']['products']
+        print(products)
+        send_mail(
+            subject="Here is your order infos",
+            message="Thanks for your purchase, here's your ordered products" + json.load(products) + ".",
+            recipient_list=[stripe_customer_email],
+            from_email="alin@jdecommerce.com"
+        )
 
     return HttpResponse(status=200)
